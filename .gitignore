@@ -480,3 +480,24 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/
+.classpath
+.project
+.settings/
+*.log
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# Visual Studio Code
+.vscode/
+
