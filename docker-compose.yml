@@ -21,3 +21,71 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Java: Fetches live crypto prices from CoinGecko and publishes to 'crypto-prices' topic
+  java-producer:
+    build:
+      context: ./Kafka-Java
+    container_name: java-producer
+    depends_on:
+      broker:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: broker:29092
+      KAFKA_ROLE: producer
+      # Optional: set your free CoinGecko Demo API key to avoid 429 rate-limit errors
+      # Get one free at https://www.coingecko.com/api
+      # COINGECKO_API_KEY: your_key_here
+    restart: on-failure
+
+  # Java: Consumes 'crypto-prices' and computes moving average & price difference
+  # Also exposes GET http://localhost:8081/analytics for the dashboard
+  java-analytics:
+    build:
+      context: ./Kafka-Java
+    container_name: java-analytics
+    depends_on:
+      broker:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: broker:29092
+      KAFKA_ROLE: analytics
+    restart: on-failure
+
+  # .NET: Logs all crypto price events to the console
+  dotnet-logger:
+    build:
+      context: ./Kafka-Net
+    container_name: dotnet-logger
+    depends_on:
+      broker:
+        condition: service_healthy
+    environment:
+      Kafka__BootstrapServers: broker:29092
+      KAFKA_ROLE: logger
+      ASPNETCORE_URLS: http://+:5001
+    restart: on-failure
+
+  # .NET: Forwards crypto price events to connected WebSocket/SignalR clients at /hubs/crypto
+  dotnet-forwarder:
+    build:
+      context: ./Kafka-Net
+    container_name: dotnet-forwarder
+    depends_on:
+      broker:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    environment:
+      Kafka__BootstrapServers: broker:29092
+      KAFKA_ROLE: forwarder
+      ASPNETCORE_URLS: http://+:5000
+    restart: on-failure
